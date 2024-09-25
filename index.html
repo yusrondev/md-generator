@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Editor Popup</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Style for the floating hint menu */
+        .hint-popup {
+            position: absolute;
+            display: none;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .hint-popup ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .hint-popup li {
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+
+        .hint-popup li:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container mt-4">
+        <!-- Textarea -->
+        <textarea id="editorTextarea" class="form-control" rows="6" placeholder="Type something here..."></textarea>
+    </div>
+
+    <!-- Floating Hint Menu -->
+    <div id="hintPopup" class="hint-popup">
+        <button>B</button>
+        <button>I</button>
+        <button>U</button>
+        <ul>
+            <li id="boldOption">Bold</li>
+            <li id="italicOption">Italic</li>
+            <li id="underlineOption">Underline</li>
+        </ul>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- jQuery Caret Plugin -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/caret/1.3.7/jquery.caret.min.js"
+        integrity="sha512-DR6H+EMq4MRv9T/QJGF4zuiGrnzTM2gRVeLb5DOll25f3Nfx3dQp/NlneENuIwRHngZ3eN6w9jqqybT3Lwq+4A=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Bootstrap JS and Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            var hintPopup = $('#hintPopup');
+
+            // Detect keyup and show floating popup beside the caret
+            $('#editorTextarea').on('keyup', function (e) {
+                var textarea = $(this);
+                var caretPosition = textarea.caret(); // Get the caret position in character index
+
+                if (e.key === '/') {
+                    // Get caret position in pixels relative to textarea
+                    var textareaOffset = textarea.offset(); // Get textarea offset relative to the document
+                    var caretPixelPosition = textarea.caret('offset', { iframe: true }); // Get caret's pixel position
+
+                    // Adjust the position by scroll and offsets
+                    var popupX = caretPixelPosition.left + textareaOffset.left; // Calculate the left position
+                    var popupY = caretPixelPosition.top + textareaOffset.top - textarea.scrollTop() - 30; // Calculate top position above caret (subtracting 30px to position it above)
+
+                    // Show the hint popup at the caret position
+                    hintPopup.css({
+                        top: 0 + 'px',
+                        left: 400 + 'px'
+                    }).fadeIn();
+                }
+            });
+
+            // Apply formatting when a hint option is clicked
+            $('#boldOption, #italicOption, #underlineOption').on('click', function () {
+                var textarea = document.getElementById('editorTextarea');
+                var start = textarea.selectionStart;
+                var end = textarea.selectionEnd;
+                var value = textarea.value;
+
+                // Find the position of the last "/"
+                var slashIndex = value.lastIndexOf('/', start);
+
+                if (slashIndex !== -1) {
+                    // Remove the "/" and add formatting
+                    textarea.value = value.slice(0, slashIndex) + value.slice(slashIndex + 1);
+
+                    // Recalculate selection start and end after removing "/"
+                    start = slashIndex;
+                    end = textarea.selectionEnd - 1;
+                }
+
+                // Determine the formatting based on the clicked option
+                var wrapper;
+                if ($(this).attr('id') === 'boldOption') {
+                    wrapper = '**'; // Markdown-style bold
+                } else if ($(this).attr('id') === 'italicOption') {
+                    wrapper = '*'; // Markdown-style italic
+                } else if ($(this).attr('id') === 'underlineOption') {
+                    wrapper = '__'; // Markdown-style underline
+                }
+
+                formatText(wrapper, start, end);
+                hintPopup.fadeOut();
+            });
+
+            // Function to format the text and place the cursor inside the "your text" placeholder
+            function formatText(wrapper, start, end) {
+                var textarea = document.getElementById('editorTextarea');
+                var selectedText = textarea.value.substring(start, end);
+
+                // If no text is selected, insert placeholder text "your text"
+                if (selectedText === '') {
+                    selectedText = 'your text'; // Placeholder text
+                }
+
+                // Wrap the selected or placeholder text with the formatting wrapper (e.g., ** for bold)
+                var formattedText = wrapper + selectedText + wrapper;
+
+                // Update the textarea value with the formatted text
+                textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+
+                // Position the caret at the start of the placeholder "your text"
+                var placeholderStart = start + wrapper.length; // Start of "your text"
+                var placeholderEnd = placeholderStart + selectedText.length;
+
+                // Re-set the cursor to start at the beginning of "your text"
+                textarea.setSelectionRange(placeholderStart, placeholderEnd);
+                textarea.focus();
+            }
+
+            // Hide popup when clicking outside or making a selection
+            $(document).on('click', function (e) {
+                if (!$(e.target).closest('#hintPopup, #editorTextarea').length) {
+                    hintPopup.fadeOut();
+                }
+            });
+        });
+    </script>
+
+</body>
+
+</html>
