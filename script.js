@@ -12,13 +12,13 @@ $(document).ready(function () {
                 const driver = window.driver.js.driver;
                 const driverObj = driver();
 
-                driverObj.highlight({
-                    element: "#head1",
-                    popover: {
-                        title: "Tahan dan tarik!",
-                        description: "Tahan dan tarik bagian ini untuk menambahkan konten"
-                    }
-                });
+                // driverObj.highlight({
+                //     element: "#head1",
+                //     popover: {
+                //         title: "Tahan dan tarik!",
+                //         description: "Tahan dan tarik bagian ini untuk menambahkan konten"
+                //     }
+                // });
                 flag_drive++;
             }
         }
@@ -159,7 +159,8 @@ $(document).ready(function () {
             let target_elem_next = currentElement.next();
 
             // Check if Ctrl + Delete is pressed to remove non-CodeMirror elements
-            if (e.ctrlKey && e.key === "Delete") {
+            if (e.ctrlKey && e.key === "Delete" || e.metaKey && e.key === "Backspace") {
+                $('#modalChooseFile').show();
                 if (!currentElement.hasClass('code-wrapper')) {
                     currentElement.remove(); // Remove non-CodeMirror element
                     if (target_elem_next.length > 0) {
@@ -182,20 +183,21 @@ $(document).ready(function () {
                 }
             }
 
-            // Check if Ctrl is pressed along with the ArrowUp key
-            if (e.ctrlKey && e.key === "ArrowUp") {
-                let prevElement = currentElement.prev(".dropped-item");
+            // Check if Ctrl or Command is pressed along with the ArrowUp key
+            if ((e.ctrlKey || e.metaKey) && e.key === "ArrowUp") {
+                let prevElement = currentElement.prev();
                 if (prevElement.length) {
-                    currentElement.insertBefore(prevElement);
-                    currentElement.focus();
+                    currentElement.insertBefore(prevElement); // Move element up
+                    currentElement.focus(); // Refocus after reordering
                 }
             }
-            // Check if Ctrl is pressed along with the ArrowDown key
-            else if (e.ctrlKey && e.key === "ArrowDown") {
-                let nextElement = currentElement.next(".dropped-item");
+
+            // Check if Ctrl or Command is pressed along with the ArrowDown key
+            else if ((e.ctrlKey || e.metaKey) && e.key === "ArrowDown") {
+                let nextElement = currentElement.next();
                 if (nextElement.length) {
-                    currentElement.insertAfter(nextElement);
-                    currentElement.focus();
+                    currentElement.insertAfter(nextElement); // Move element down
+                    currentElement.focus(); // Refocus after reordering
                 }
             }
         });
@@ -210,7 +212,7 @@ $(document).ready(function () {
     }
 
     $(document).keydown(function (event) {
-        if (event.ctrlKey && event.keyCode === 83) { // Ctrl + S
+        if (event.ctrlKey && event.keyCode === 83 || event.metaKey && event.key === 's') { // Ctrl + S
             event.preventDefault();
             let markdownContent = "";
             let file_name = "";
@@ -278,24 +280,58 @@ $(document).ready(function () {
         // When file is loaded, parse its content
         reader.onload = function (event) {
             let markdownContent = event.target.result;
-    
-            // Convert Markdown to HTML using marked.js
-            let htmlContent = marked.parse(markdownContent);
-    
+        
+            console.log(markdownContent);
+        
+            // Regular expression to detect code blocks starting with ```js or ```php
+            const codeBlockRegex = /```(js|php)([\s\S]*?)```/g;
+        
+            // Split the markdownContent into HTML and code blocks
+            let htmlContent = marked.parse(markdownContent.replace(codeBlockRegex, (match, lang, codeContent, offset, str) => {
+                // Trim the code content
+                codeContent = codeContent.trim();
+                
+                // Create a unique identifier for this code block
+                const codeID = `code${offset}`;
+                
+                // Append a placeholder in the HTML for the CodeMirror editor (in the right position)
+                return `<textarea data-lang="${lang}" id="${codeID}" name="code" class="dropped-item">${codeContent}</textarea>`;
+            }));
+        
             // Clear any existing elements in the droppable area
             $(".droppable-area").empty();
-    
-            // Append the generated HTML to the droppable area
+        
+            // Append the generated HTML (with textareas in place) to the droppable area
             $(".droppable-area").append(htmlContent);
-
-            $.each($(htmlContent), function(k, v){
-                attachKeyboardNavigation($(v));
-            })
-            
-    
-            // Add the necessary contenteditable properties
-            $(".droppable-area h1, .droppable-area h2, .droppable-area h3, .droppable-area p").attr("contenteditable", "true");
-        };
+        
+            // Now, for each textarea, initialize CodeMirror in its current position
+            $(".droppable-area textarea").each(function(index) {
+                let mode = $(this).attr('data-lang') === 'js' ? 'javascript' : 'application/x-httpd-php';
+                
+                // Initialize CodeMirror for this textarea
+                let editor = CodeMirror.fromTextArea(this, {
+                    lineNumbers: true,
+                    mode: mode,  // Use the dynamically determined mode
+                    theme: 'material-darker',
+                    tabSize: 2,
+                    matchBrackets: true,
+                    autoCloseBrackets: true
+                });
+        
+                // Store the CodeMirror instance
+                codeMirrorInstances.push({ element: $(this), editor: editor });
+            });
+        
+            // Add contenteditable and other attributes for headings and paragraphs
+            $(".droppable-area h1, .droppable-area h2, .droppable-area h3, .droppable-area p")
+                .attr("contenteditable", "true")
+                .addClass("dropped-item")
+                .attr("tabindex", 0)
+                .attr("data-placeholder", "...");
+        
+            // Attach keyboard navigation to the elements
+            attachKeyboardNavigation($(".droppable-area h1, .droppable-area h2, .droppable-area h3, .droppable-area p"));
+        };        
     
         // Read the file as text
         reader.readAsText(file);
